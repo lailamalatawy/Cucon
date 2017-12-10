@@ -1,5 +1,5 @@
 # Cucon
-An iOS currency conversion chatbot application, that proveides better usability than any other currency conversion application available on the appstore.
+An iOS currency conversion chatbot application, that provides better usability than any other currency conversion application available on the appstore.
  
 ## Usage
 ### Prerequisites
