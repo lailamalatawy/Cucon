@@ -1,20 +1,19 @@
 import UIKit
 
-
 class ViewController: UIViewController, UITextFieldDelegate {
     
+    // message vars
     var uuid = ""
     var welcome_message = ""
-    var received_message = ""
+    var api_response = ""
     
+    // bubble layout vars
     var interCellPadding: Float = 10.0
     var yOff: Int = 60
-    var previousWasLeft = false
-    
     var numLinesPrev = 1
-    
     var previousLabelText = ""
     var previousResponse = ""
+    
     
     @IBOutlet weak var infoButon: UIButton!
     @IBOutlet weak var historyButton: UIButton!
@@ -24,157 +23,138 @@ class ViewController: UIViewController, UITextFieldDelegate {
     @IBOutlet weak var scrollviewKeyboard: UIScrollView!
     @IBOutlet weak var mainScrollView: UIScrollView!
     
-    @IBAction func onGo(_ sender: UIButton) {
+    @IBAction func onSend(_ sender: UIButton) {
         
         if !(Reachability.isConnectedToNetwork()) {
-            print("Internet Connection not Available!")
+            print("no internet connection.")
             DispatchQueue.main.async {
-                let alignLeft = true
-                self.previousWasLeft = alignLeft
-                
-                let bubble = self.chatBubble(text: "You seem to be offline. Please conncet to the internet.", y_offset: self.yOff, leftAligned: alignLeft)
-                self.mainview.addSubview(bubble)
+                self.displayBubble(text: "You seem to be offline. Please conncet to the internet.", alignLeft: true)
             }
         }
         
         if !(textfield.text == "") {
-            if let response = textfield.text {
-                print("user response: \(response)!")
+            if let user_response = textfield.text {
+                print("user response: \(user_response)!")
+                
+                var base_unsaved = ""
+                var dest_unsaved = ""
                 
                 if previousLabelText == "What's your name?" {
-                    UserDefaults.standard.set(response, forKey: "name")
+                    let name = user_response.firstUppercased
+                    UserDefaults.standard.set(name, forKey: "name")
+                    print("user name in userdefaults set to: \(name)")
                 }
                 
                 if previousLabelText.contains("Where are you right now?") {
-                    UserDefaults.standard.set(response, forKey: "base")
+                    base_unsaved = user_response.firstUppercased
                 }
                 
                 if previousLabelText.contains("country are you going to?") {
-                    UserDefaults.standard.set(response, forKey: "dest")
+                    dest_unsaved = user_response.firstUppercased
                 }
                 
                 
-                if response.contains("source: ") {
-                    let start = response.index(response.startIndex, offsetBy: 8)
-                    let end = response.index(response.startIndex, offsetBy: response.count)
+                if user_response.contains("source: ") {
+                    let start = user_response.index(user_response.startIndex, offsetBy: 8)
+                    let end = user_response.index(user_response.startIndex, offsetBy: user_response.count)
                     let range = start..<end
-                    let country = response[range]
-                    print("COUNTRURUURURURUU: \(country)")
-                    UserDefaults.standard.set(country, forKey: "base")
+                    base_unsaved = String(user_response[range]).firstUppercased
                 }
                 
-                if response.contains("dest: ") {
-                    let start = response.index(response.startIndex, offsetBy: 6)
-                    let end = response.index(response.startIndex, offsetBy: response.count)
+                if user_response.contains("dest: ") {
+                    let start = user_response.index(user_response.startIndex, offsetBy: 6)
+                    let end = user_response.index(user_response.startIndex, offsetBy: user_response.count)
                     let range = start..<end
-                    let country = response[range]
-                    print("COUNTRURUURURURUU: \(country)")
-                    UserDefaults.standard.set(country, forKey: "dest")
+                    dest_unsaved = String(user_response[range]).firstUppercased
                 }
                 
-                
+                // displaying user's enterd text in a bubble on screen
                 DispatchQueue.main.async {
-                    let alignLeft = false
-                    self.previousWasLeft = alignLeft
-                    let bubble = self.chatBubble(text: response, y_offset: self.yOff, leftAligned: alignLeft)
-                    self.mainview.addSubview(bubble)
+                    self.displayBubble(text: user_response, alignLeft: false)
                 }
                 
-                previousResponse = response
+                // resetting to defaults
+                previousResponse = user_response
                 textfield.text = ""
                 
 
-                ChatJSON.chat(uuid: self.uuid, message: response) { (result: ChatJSON) in
-                    self.received_message = result.json_returned["message"]!
-                    print("received_message: \(self.received_message)")
+                let previousLabelTextSaved = previousLabelText
+                var changed = false
+                
+                ChatJSON.chat(uuid: self.uuid, message: user_response) { (result: ChatJSON) in
+                    self.api_response = result.json_returned["message"]!
+                    print("api_response: \(self.api_response)")
                     
-                    if self.received_message.contains("Hello") {
-                        let x = UserDefaults.standard.object(forKey: "name") as? String
-                        self.received_message = "Hello \(x ?? "?")! Where are you right now?"
+                    if self.api_response.contains("Hello") {
+                        let name_fetched = UserDefaults.standard.object(forKey: "name") as? String
+                        self.api_response = "Hello \(name_fetched ?? "?")! Where are you right now?"
+                        changed = true
                     }
                     
-                    if self.received_message.contains("Invalid") {
-                        let x = UserDefaults.standard.object(forKey: "name") as? String
-                        self.received_message = "Sorry \(x ?? "?"), the country name you entered seems to be invalid. Try entering a valid one."
+                    if self.api_response.contains("Invalid") {
+                        let name_fetched = UserDefaults.standard.object(forKey: "name") as? String
+                        self.api_response = "Sorry \(name_fetched ?? "?"), the country name you entered seems to be invalid. Try entering a valid one."
+                        changed  = true
                     }
                     
-                    if self.received_message.contains("So you are from") {
-                        let x = UserDefaults.standard.object(forKey: "base") as? String
-                        self.received_message = "\(x ?? "?"), noted. And which country are you going to?"
+                    if self.api_response.contains("So you are from") {
+                        UserDefaults.standard.set(base_unsaved, forKey: "base")
+                        print("base country in userdefaults set to: \(base_unsaved)")
+                        
+                        let base_fetched = UserDefaults.standard.object(forKey: "base") as? String
+                        self.api_response = "\(base_fetched ?? "?"), noted. And which country are you going to?"
+                        changed = true
                     }
                     
-                    if self.received_message.contains("So you are going") {
-                        let x = UserDefaults.standard.object(forKey: "dest") as? String
-                        self.received_message = "\(x ?? "?"), awesome!"
+                    if self.api_response.contains("So you are going") {
+                        UserDefaults.standard.set(dest_unsaved, forKey: "dest")
+                        print("destination country in userdefaults set to: \(dest_unsaved)")
+                        
+                        let destination_fetched = UserDefaults.standard.object(forKey: "dest") as? String
+                        self.api_response = "\(destination_fetched ?? "?"), awesome!"
+                        changed = true
                     }
                     
+                    if self.api_response.contains("source country changed successfully") {
+                        UserDefaults.standard.set(base_unsaved, forKey: "base")
+                        print("source country in userdefaults changed to: \(base_unsaved)")
+                        self.api_response = "Source country changed successfully to \(base_unsaved)."
+                    }
+                    
+                    if self.api_response.contains("destination country changed successfully") {
+                        UserDefaults.standard.set(dest_unsaved, forKey: "dest")
+                        print("destination country in userdefaults changed to: \(dest_unsaved)")
+                        self.api_response = "Destination country changed successfully to \(dest_unsaved)."
+                    }
+
                     DispatchQueue.main.async {
-                        let alignLeft = true
-                        self.previousWasLeft = alignLeft
-                        
-                        if self.received_message.contains("<country>") {
-                            let bubble1 = self.chatBubble(text: "Here are some tips that will help you out:", y_offset: self.yOff, leftAligned: alignLeft)
-                            let bubble2 = self.chatBubble(text: "To change currency from the source to the destination country, just type in the amount straight away", y_offset: self.yOff, leftAligned: alignLeft)
-                            let bubble3 = self.chatBubble(text: "To change source country, just type in: source: <new_country_name>", y_offset: self.yOff, leftAligned: alignLeft)
-                            let bubble4 = self.chatBubble(text: "To change destination country, just type in: dest: <new_country_name>", y_offset: self.yOff, leftAligned: alignLeft)
-                            
-                            self.mainview.addSubview(bubble1)
-                            self.mainview.addSubview(bubble2)
-                            self.mainview.addSubview(bubble3)
-                            self.mainview.addSubview(bubble4)
-                        } else {
-                            let bubble = self.chatBubble(text: self.received_message, y_offset: self.yOff, leftAligned: alignLeft)
-                            self.mainview.addSubview(bubble)
+                        if changed {
+                            self.displayBubble(text: self.api_response, alignLeft: true)
+                            self.previousLabelText = self.api_response
                         }
-                        
-                        print("rec message: \(self.received_message)")
-                        print("prev label: \(self.previousLabelText)")
-                        
-                        if self.received_message.contains("awesome") || self.received_message.contains("<country>") {
-                            let bubble1 = self.chatBubble(text: "Here are some tips that will help you out:", y_offset: self.yOff, leftAligned: alignLeft)
-                            let bubble2 = self.chatBubble(text: "To change currency from the source to the destination country, just type in the amount straight away", y_offset: self.yOff, leftAligned: alignLeft)
-                            let bubble3 = self.chatBubble(text: "To change source country, just type in: source: <new_country_name>", y_offset: self.yOff, leftAligned: alignLeft)
-                            let bubble4 = self.chatBubble(text: "To change destination country, just type in: dest: <new_country_name>", y_offset: self.yOff, leftAligned: alignLeft)
-                            
-                            self.mainview.addSubview(bubble1)
-                            self.mainview.addSubview(bubble2)
-                            self.mainview.addSubview(bubble3)
-                            self.mainview.addSubview(bubble4)
-                        }
-                        
-                        
-                        
-                        if self.received_message.contains("valid") {
-                            print("TRUE")
-                            if self.previousLabelText.contains("Where are you right now?") {
-                                UserDefaults.standard.set(nil, forKey: "base")
-                            } else if self.previousLabelText.contains("country are you going to?") {
-                                UserDefaults.standard.set(nil, forKey: "dest")
-                            }
-                            
-                        } else {
-                            self.previousLabelText = self.received_message
-                            print("FALSE")
-                        }
-                        
-                        if self.received_message.contains("valid") {
+
+                        if self.api_response.contains("awesome") {
+                            self.displayInfo(gibberish: false)
+                        } else if self.api_response.contains("<country>") {
+                            self.displayInfo(gibberish: true)
+                        } else if self.api_response.contains("valid") {
                             var text = ""
-                            if self.previousLabelText.contains("country are you going to?") {
-                                text = "Which country are you going to?"
-                            } else if self.previousLabelText.contains("Where are you right now?") {
-                                text = "Where are you right now?"
+                            if previousLabelTextSaved.contains("Where are you right now?") {
+                                text = "Where are you right now?"           // reinquire source country
+                            } else if previousLabelTextSaved.contains("country are you going to?") {
+                                text = "Which country are you going to?"    // reinquire destination country
                             }
                             
-                            print("text: \(text)")
+                            
                             if !(text == "") {
-                                let bubble = self.chatBubble(text: text, y_offset: self.yOff, leftAligned: alignLeft)
-                                self.mainview.addSubview(bubble)
+                                self.displayBubble(text: text, alignLeft: true)
                                 self.previousLabelText = text
                             }
-                  
+                        } else if !changed {
+                            self.displayBubble(text: self.api_response, alignLeft: true)
+                            self.previousLabelText = self.api_response
                         }
                     }
-                    
                 }
             } else {
                 print("No response was received.")
@@ -185,173 +165,144 @@ class ViewController: UIViewController, UITextFieldDelegate {
     
     @IBAction func onHistoryButtonTouch(_ sender: UIButton) {
         var text = ""
-        if let x = UserDefaults.standard.object(forKey: "base") as? String {
-            if let y = UserDefaults.standard.object(forKey: "dest") as? String {
-                text = "Base country: \(x), destination country: \(y)"
-            } else {
-                text = "Base country: \(x)"
-            }
-        } else {
-            text = "Sorry, there are no saved setting yet."
-        }
-
         DispatchQueue.main.async {
             let alignLeft = true
-            self.previousWasLeft = alignLeft
-            let bubble = self.chatBubble(text: text, y_offset: self.yOff, leftAligned: alignLeft)
-            self.mainview.addSubview(bubble)
+            
+            if let base_fetched = UserDefaults.standard.object(forKey: "base") as? String {
+                if let destination_fetched = UserDefaults.standard.object(forKey: "dest") as? String {
+                    text = "Source country: \(base_fetched)"
+                    let bubble1 = self.chatBubble(text: text, y_offset: self.yOff, leftAligned: alignLeft)
+                    print("bubble content:  \(text)")
+                    self.mainview.addSubview(bubble1)
+                    
+                    text = "Destination country: \(destination_fetched)"
+                    let bubble2 = self.chatBubble(text: text, y_offset: self.yOff, leftAligned: alignLeft)
+                    print("bubble content:  \(text)")
+                    self.mainview.addSubview(bubble2)
+                } else {
+                    text = "Source country: \(base_fetched)"
+                    self.displayBubble(text: text, alignLeft: true)
+                }
+            } else {
+                text = "Sorry, there are no saved settings."
+                self.displayBubble(text: text, alignLeft: true)
+            }
         }
-        
     }
     
     @IBAction func onInfoButtonTouch(_ sender: UIButton) {
          DispatchQueue.main.async {
-            let alignLeft = true
-            self.previousWasLeft = alignLeft
-            
-            let bubble1 = self.chatBubble(text: "Here are some tips that will help you out:", y_offset: self.yOff, leftAligned: alignLeft)
-            let bubble2 = self.chatBubble(text: "To change currency from the source to the destination country, just type in the amount straight away", y_offset: self.yOff, leftAligned: alignLeft)
-            let bubble3 = self.chatBubble(text: "To change source country, just type in: source: <new_country_name>", y_offset: self.yOff, leftAligned: alignLeft)
-            let bubble4 = self.chatBubble(text: "To change destination country, just type in: des:t <new_country_name>", y_offset: self.yOff, leftAligned: alignLeft)
-            
-            self.mainview.addSubview(bubble1)
-            self.mainview.addSubview(bubble2)
-            self.mainview.addSubview(bubble3)
-            self.mainview.addSubview(bubble4)
+            self.displayInfo(gibberish: false)
         }
     }
-    
     
     
     override func viewDidLoad() {
     
         super.viewDidLoad()
         
-        if let x = UserDefaults.standard.object(forKey: "name") as? String {
-            print("name: \(x)")
+        if let name_fetched = UserDefaults.standard.object(forKey: "name") as? String {
+            print("name: \(name_fetched)")
         }
-        if let x = UserDefaults.standard.object(forKey: "base") as? String {
-            print("base: \(x)")
+        if let base_fetched = UserDefaults.standard.object(forKey: "base") as? String {
+            print("base: \(base_fetched)")
         }
-        if let x = UserDefaults.standard.object(forKey: "dest") as? String {
-            print("dest: \(x)")
+        if let destination_fetched = UserDefaults.standard.object(forKey: "dest") as? String {
+            print("dest: \(destination_fetched)")
         }
         
-        
-        
+        // Textfield Layout
         textfield.layer.cornerRadius = 10
-        button.layer.cornerRadius = 10
-        
-        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 20, height: 20))
-        textfield.leftView = paddingView
+        textfield.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 20, height: 20))   // the padding view of the textfield
         textfield.leftViewMode = .always
         textfield.placeholder = "Type text here..."
         
+        // Send Button Layout
+        button.layer.cornerRadius = 10
+        
+        
         if Reachability.isConnectedToNetwork(){
-            print("Internet Connection Available!")
+            print("internet connection available.")
             
         } else {
-            print("Internet Connection not Available!")
+            print("no internet connection.")
             DispatchQueue.main.async {
-                let alignLeft = true
-                self.previousWasLeft = alignLeft
-                
-                let bubble = self.chatBubble(text: "You seem to be offline. Please conncet to the internet.", y_offset: self.yOff, leftAligned: alignLeft)
-                self.mainview.addSubview(bubble)
+                self.displayBubble(text: "You seem to be offline. Please conncet to the internet.", alignLeft: true)
             }
         }
         
         
         WelcomeJSON.welcome { (result: WelcomeJSON) in
             self.uuid = result.json_returned["uuid"]!
-            print("SELF UUID: \(self.uuid)")
+            print("json received uuid: \(self.uuid)")
             self.welcome_message = result.json_returned["message"]!
   
             DispatchQueue.main.async {
-                let alignLeft = true
-                self.previousWasLeft = alignLeft
-                if let x = UserDefaults.standard.object(forKey: "name") as? String {
-                    self.welcome_message = "Welcome back, \(x)!"
-                    self.previousLabelText = "Welcome back, \(x)!"
+                if let name_fetched = UserDefaults.standard.object(forKey: "name") as? String {
+                    self.welcome_message = "Welcome back, \(name_fetched)!"
+                    self.previousLabelText = self.welcome_message
                 } else {
-                    let bubble = self.chatBubble(text: "Hi mate! Welcome to Cucon. My name is Chip, I'm here to help you out.", y_offset: self.yOff, leftAligned: alignLeft)
-                    self.mainview.addSubview(bubble)
+                    let text = "Hi, mate! Welcome to Cucon. My name is Chip, I'm here to help you out."
+                    self.displayBubble(text: text, alignLeft: true)
                     self.previousLabelText = "What's your name?"
                 }
                 
-                let bubble = self.chatBubble(text: self.welcome_message, y_offset: self.yOff, leftAligned: alignLeft)
-                self.mainview.addSubview(bubble)
+                self.displayBubble(text: self.welcome_message, alignLeft: true)
             }
+            
             self.previousLabelText = self.welcome_message
             print("uuid: \(self.uuid)")
             print("message: \(self.welcome_message)")
+           
             
             
-            
-            // RETRIEVING FROM CELL
-            
-            if let x = (UserDefaults.standard.object(forKey: "name") as? String) {
+            // Retrieving from cell
+            if let name_fetched = (UserDefaults.standard.object(forKey: "name") as? String) {
                 var internal_message = ""
-                print("HERE name: \(x)")
+                print("Name fetched: \(name_fetched)")
                 
-                ChatJSON.chat(uuid: self.uuid, message: x) { (result: ChatJSON) in
+                ChatJSON.chat(uuid: self.uuid, message: name_fetched) { (result: ChatJSON) in
                     internal_message = result.json_returned["message"]!
                     print("internal_received_message: \(internal_message)")
                 }
                 
-                if let x = UserDefaults.standard.object(forKey: "base") as? String {
-                    print("HERE base: \(x)")
-                    print("HERE uuid: \(self.uuid)")
+                if let base_fetched = UserDefaults.standard.object(forKey: "base") as? String {
+                    print("Base fetched: \(base_fetched)")
                     
-                    ChatJSON.chat(uuid: self.uuid, message: x) { (result: ChatJSON) in
+                    ChatJSON.chat(uuid: self.uuid, message: base_fetched) { (result: ChatJSON) in
                         internal_message = result.json_returned["message"]!
                         print("internal_received_message: \(internal_message)")
                     }
                     
-                    if let x = UserDefaults.standard.object(forKey: "dest") as? String {
-                        ChatJSON.chat(uuid: self.uuid, message: x) { (result: ChatJSON) in
+                    if let destination_fetched = UserDefaults.standard.object(forKey: "dest") as? String {
+                        ChatJSON.chat(uuid: self.uuid, message: destination_fetched) { (result: ChatJSON) in
                             internal_message = result.json_returned["message"]!
                             print("internal_received_message: \(internal_message)")
                         }
+                        
                     } else {
                         DispatchQueue.main.async {
-                            let alignLeft = true
-                            self.previousWasLeft = alignLeft
                             let text = "Which country are you going to?"
-                            let bubble = self.chatBubble(text: text , y_offset: self.yOff, leftAligned: alignLeft)
-                            self.mainview.addSubview(bubble)
+                            self.displayBubble(text: text, alignLeft: true)
                             self.previousLabelText = text
                         }
                     }
                     
-                    
                 } else {
                     DispatchQueue.main.async {
-                        let alignLeft = true
-                        self.previousWasLeft = alignLeft
                         let text = "Where are you right now?"
-                        let bubble = self.chatBubble(text: text, y_offset: self.yOff, leftAligned: alignLeft)
-                        self.mainview.addSubview(bubble)
+                        self.displayBubble(text: text, alignLeft: true)
                         self.previousLabelText = text
                     }
-                    
                 }
             }
-            
-            
-            
-            
-            
-            
-            
         }
-        
     }
+    
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         self.view.endEditing(true)
     }
-    
     
     func chatBubble(text: String, y_offset: Int, leftAligned: Bool) -> UIView {
         
@@ -363,7 +314,6 @@ class ViewController: UIViewController, UITextFieldDelegate {
         label.text = text
         label.numberOfLines = 0
         label.sizeToFit()
-
         
         let width : CGFloat = label.frame.size.width
         let height : CGFloat = label.frame.size.height
@@ -382,6 +332,7 @@ class ViewController: UIViewController, UITextFieldDelegate {
         return bubbleView
     }
     
+    
     func lines(label: UILabel) -> Int {
         let textSize = CGSize(width: label.frame.size.width, height: CGFloat(Float.infinity))
         let rHeight = lroundf(Float(label.sizeThatFits(textSize).height))
@@ -390,10 +341,12 @@ class ViewController: UIViewController, UITextFieldDelegate {
         return lineCount
     }
     
+    
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         textField.resignFirstResponder()
         return true
     }
+    
     
     func textFieldDidBeginEditing(_ textField: UITextField) {
         scrollviewKeyboard.setContentOffset(CGPoint(x: 0, y: 250), animated: true)
@@ -402,8 +355,37 @@ class ViewController: UIViewController, UITextFieldDelegate {
     func textFieldDidEndEditing(_ textField: UITextField) {
         scrollviewKeyboard.setContentOffset(CGPoint(x: 0, y: 0), animated: true)
     }
+    
+    func displayBubble(text: String, alignLeft: Bool) {
+        let bubble = self.chatBubble(text: text, y_offset: self.yOff, leftAligned: alignLeft)
+        print("bubble content:  \(text)")
+        self.mainview.addSubview(bubble)
+    }
+    
+    func displayInfo(gibberish: Bool) {
+        let alignLeft = true
+        var text = ""
+        
+        if gibberish {
+            text = "I can't quite get what you're saying. Here are some tips that might help you out:"
+        } else {
+            text = "Here are some tips that might help you out:"
+        }
+        
+        let bubble1 = self.chatBubble(text: text, y_offset: self.yOff, leftAligned: alignLeft)
+        let bubble2 = self.chatBubble(text: "To change currency from the source to the destination country, just type in the amount straight away", y_offset: self.yOff, leftAligned: alignLeft)
+        let bubble3 = self.chatBubble(text: "To change source country, just type in: source: <new_country_name>", y_offset: self.yOff, leftAligned: alignLeft)
+        let bubble4 = self.chatBubble(text: "To change destination country, just type in: dest: <new_country_name>", y_offset: self.yOff, leftAligned: alignLeft)
+        
+        self.mainview.addSubview(bubble1)
+        self.mainview.addSubview(bubble2)
+        self.mainview.addSubview(bubble3)
+        self.mainview.addSubview(bubble4)
+    }
 
 }
+
+
 
 class myUILabel : UILabel {
     override func drawText(in rect: CGRect) {
@@ -412,6 +394,7 @@ class myUILabel : UILabel {
         
     }
 }
+
 
 extension UIScrollView {
     //it will block the mainThread
@@ -430,6 +413,18 @@ extension UIScrollView {
         return totalRect.union(view.frame)
     }
 }
+
+
+extension String {
+    var firstUppercased: String {
+        guard let first = first else {
+            return "error getting first character of string."
+            
+        }
+        return String(first).uppercased() + dropFirst()
+    }
+}
+
 
 //extension UIViewController {
 //    func hideKeyboardWhenTappedAround() {

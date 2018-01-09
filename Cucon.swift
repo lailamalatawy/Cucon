@@ -11,9 +11,7 @@ struct WelcomeJSON {
         }
         
         let task = URLSession.shared.dataTask(with: welcome_url) { (data:Data?, response:URLResponse?, error:Error?) in
-            
             var welcomeJSON = WelcomeJSON()
-            
             if let data = data {
                 do {
                     if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String:String] {
@@ -27,9 +25,7 @@ struct WelcomeJSON {
         }
         task.resume()
     }
-    
 }
-
 
 
 struct ChatJSON {
@@ -55,9 +51,7 @@ struct ChatJSON {
 
         
         let task = URLSession.shared.dataTask(with: request) { (data:Data?, response:URLResponse?, error:Error?) in
-            
             var chatJSON = ChatJSON()
-            
             if let data = data {
                 do {
                     if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String:String] {
@@ -71,7 +65,4 @@ struct ChatJSON {
         }
         task.resume()
     }
-    
 }
-
-
